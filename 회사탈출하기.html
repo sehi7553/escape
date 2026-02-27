@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>다은이의 칼퇴 기원 탈출 게임! (지옥 난이도)</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #212529;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #f8f9fa;
+        }
+        #gameCanvas {
+            background-color: #ffffff;
+            border: 3px solid #ff6b6b;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+        }
+        #ui {
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 10px 25px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #fa5252;
+        }
+        .instructions {
+            color: #ced4da;
+            margin-top: 10px;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🏃‍♀️ 다은이의 지옥 탈출 🏃‍♀️</h1>
+    <div id="ui">
+        <button id="startBtn">게임 시작 / 재시작</button>
+        <div class="instructions">방향키(⬅️➡️⬆️⬇️)로 생존하세요. 100%를 채우면 퇴근입니다!</div>
+    </div>
+    
+    <canvas id="gameCanvas" width="400" height="500"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+
+        let daeun = { x: 180, y: 400, size: 30, speed: 7 }; // 다은이 속도 살짝 증가
+        let works = [];
+        let score = 0;
+        let gameOver = false;
+        let gameWin = false;
+        let animationId;
+        let keys = {};
+        let frameCount = 0;
+
+        const workTypes = ['📁', '☎️', '📑', '💬'];
+
+        document.addEventListener('keydown', (e) => keys[e.code] = true);
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        function init() {
+            daeun = { x: 180, y: 420, size: 30, speed: 7 };
+            works = [];
+            score = 0;
+            gameOver = false;
+            gameWin = false;
+            frameCount = 0;
+            cancelAnimationFrame(animationId);
+            loop();
+        }
+
+        function spawnWork() {
+            let x = Math.random() * (canvas.width - 30);
+            // 기본 속도부터 매우 빠르고, 점수에 따라 미친 듯이 빨라짐
+            let speed = 4 + Math.random() * 4 + (score / 15); 
+            // 가로로 이동하는 속도(벽에 튕김) 추가
+            let dx = (Math.random() - 0.5) * (4 + score / 20); 
+            let type = workTypes[Math.floor(Math.random() * workTypes.length)];
+            works.push({ x: x, y: -30, size: 30, speed: speed, dx: dx, type: type });
+        }
+
+        function update() {
+            if (gameOver || gameWin) return;
+
+            if (keys['ArrowLeft'] && daeun.x > 0) daeun.x -= daeun.speed;
+            if (keys['ArrowRight'] && daeun.x < canvas.width - daeun.size) daeun.x += daeun.speed;
+            if (keys['ArrowUp'] && daeun.y > 0) daeun.y -= daeun.speed;
+            if (keys['ArrowDown'] && daeun.y < canvas.height - daeun.size - 15) daeun.y += daeun.speed;
+
+            frameCount++;
+            // 점수가 오를수록 엄청나게 자주 떨어짐
+            let spawnRate = Math.max(3, 18 - Math.floor(score / 7));
+            if (frameCount % spawnRate === 0) spawnWork();
+
+            for (let i = 0; i < works.length; i++) {
+                let w = works[i];
+                w.y += w.speed;
+                w.x += w.dx;
+
+                // 벽에 닿으면 튕기기 (난이도 급상승 주범)
+                if (w.x <= 0 || w.x >= canvas.width - w.size) {
+                    w.dx *= -1;
+                }
+
+                // 충돌 판정 (자비 없는 정밀도)
+                let hitBox = 8;
+                if (daeun.x + hitBox < w.x + w.size - hitBox &&
+                    daeun.x + daeun.size - hitBox > w.x + hitBox &&
+                    daeun.y + hitBox < w.y + w.size - hitBox &&
+                    daeun.y + daeun.size - hitBox > w.y + hitBox) {
+                    gameOver = true;
+                }
+            }
+
+            // 바닥에 떨어지면 게이지 1% 상승
+            works = works.filter(w => {
+                if (w.y > canvas.height) {
+                    if (!gameOver && !gameWin) score += 1;
+                    return false;
+                }
+                return true;
+            });
+
+            // 100% 달성 시 퇴근 성공!
+            if (score >= 100) {
+                score = 100;
+                gameWin = true;
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 다은이
+            ctx.font = '30px Arial';
+            ctx.fillText('🏃‍♀️', daeun.x, daeun.y + daeun.size);
+            ctx.font = '14px Malgun Gothic';
+            ctx.fillStyle = '#1e40af';
+            ctx.fontWeight = 'bold';
+            ctx.fillText('다은', daeun.x - 2, daeun.y + daeun.size + 15);
+
+            // 업무들
+            for (let w of works) {
+                ctx.font = '30px Arial';
+                ctx.fillText(w.type, w.x, w.y + w.size);
+            }
+
+            // 상단 게이지 표시
+            ctx.fillStyle = '#343a40';
+            ctx.font = 'bold 22px Malgun Gothic';
+            ctx.fillText('퇴근 게이지: ' + score + '%', 15, 35);
+
+            // 결과 화면 처리
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff6b6b';
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 35px Malgun Gothic';
+                ctx.fillText('과로사... (야근 확정)', canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Malgun Gothic';
+                ctx.fillText('달성률: ' + score + '%', canvas.width / 2, canvas.height / 2 + 30);
+                ctx.textAlign = 'left';
+            } else if (gameWin) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#2b8a3e';
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 40px Malgun Gothic';
+                ctx.fillText('🎉 칼퇴 성공! 🎉', canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillStyle = '#343a40';
+                ctx.font = '20px Malgun Gothic';
+                ctx.fillText('다은이는 자유의 몸입니다.', canvas.width / 2, canvas.height / 2 + 30);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            if (!gameOver && !gameWin) {
+                animationId = requestAnimationFrame(loop);
+            }
+        }
+
+        startBtn.addEventListener('click', init);
+        draw();
+    </script>
+</body>
+</html>
