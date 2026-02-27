@@ -2,32 +2,37 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>다은이의 칼퇴 기원 탈출 게임! (지옥 난이도)</title>
     <style>
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            max-width: 100vw;
+        }
         body {
             text-align: center;
             font-family: 'Malgun Gothic', sans-serif;
             background-color: #212529;
             color: white;
-            margin: 0;
-            padding: 20px;
+            padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+            min-height: 100vh;
+            min-height: 100dvh;
+            overscroll-behavior: none;
         }
         h1 {
             color: #f8f9fa;
-        }
-        #gameCanvas {
-            background-color: #ffffff;
-            border: 3px solid #ff6b6b;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+            font-size: clamp(1.1rem, 5vw, 1.6rem);
+            margin: 0.5em 0;
         }
         #ui {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         button {
-            padding: 10px 25px;
-            font-size: 18px;
+            padding: 10px 20px;
+            font-size: clamp(14px, 4vw, 18px);
             font-weight: bold;
             cursor: pointer;
             background-color: #ff6b6b;
@@ -41,8 +46,28 @@
         }
         .instructions {
             color: #ced4da;
-            margin-top: 10px;
-            font-size: 15px;
+            margin-top: 8px;
+            font-size: clamp(12px, 3.5vw, 15px);
+            padding: 0 5px;
+        }
+        .game-wrapper {
+            display: flex;
+            justify-content: center;
+            margin: 0 auto;
+            max-width: min(400px, calc(100vw - 20px));
+        }
+        #gameCanvas {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 4 / 5;
+            max-height: min(500px, calc(100vh - 160px));
+            max-height: min(500px, calc(100dvh - 160px));
+            max-width: 100%;
+            background-color: #ffffff;
+            border: 3px solid #ff6b6b;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+            touch-action: none;
         }
     </style>
 </head>
@@ -51,10 +76,12 @@
     <h1>🏃‍♀️ 다은이의 지옥 탈출 🏃‍♀️</h1>
     <div id="ui">
         <button id="startBtn">게임 시작 / 재시작</button>
-        <div class="instructions">방향키(⬅️➡️⬆️⬇️)로 생존하세요. 100%를 채우면 퇴근입니다!</div>
+        <div class="instructions">마우스 또는 터치로 다은이를 움직여 생존하세요. 100%를 채우면 퇴근입니다!</div>
     </div>
     
-    <canvas id="gameCanvas" width="400" height="500"></canvas>
+    <div class="game-wrapper">
+        <canvas id="gameCanvas" width="400" height="500"></canvas>
+    </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -72,8 +99,60 @@
 
         const workTypes = ['📁', '☎️', '📑', '💬'];
 
+        const daeunPhrases = [
+            '제발 퇴근 시켜줘!',
+            '차라리 죽을래!',
+            '집에 가고 싶어...',
+            '이게 무슨 인생이야',
+            '퇴근만 하면 돼!',
+            '못 참겠다 진짜',
+            '야근은 거절이야',
+            '오늘은 꼭 칼퇴!',
+            '살려줘...',
+            '업무 폭탄 그만!',
+            '나 퇴근할 사람이야',
+            '지금 당장 집!',
+            '몸이 안 따라와...',
+            '칼퇴의 신이시여!',
+            '더는 못 버팀'
+        ];
+        let daeunSpeech = { text: '', showUntil: 0 };
+
         document.addEventListener('keydown', (e) => keys[e.code] = true);
         document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        // 마우스/터치로 캐릭터 이동 (모바일 지원)
+        function getCanvasCoords(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+        function moveToPos(x, y) {
+            if (gameOver || gameWin) return;
+            daeun.x = Math.max(0, Math.min(canvas.width - daeun.size, x - daeun.size / 2));
+            daeun.y = Math.max(0, Math.min(canvas.height - daeun.size - 15, y - daeun.size / 2));
+        }
+        canvas.addEventListener('mousemove', (e) => {
+            const { x, y } = getCanvasCoords(e.clientX, e.clientY);
+            moveToPos(x, y);
+        });
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (e.touches.length > 0) {
+                const { x, y } = getCanvasCoords(e.touches[0].clientX, e.touches[0].clientY);
+                moveToPos(x, y);
+            }
+        }, { passive: false });
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                const { x, y } = getCanvasCoords(e.touches[0].clientX, e.touches[0].clientY);
+                moveToPos(x, y);
+            }
+        }, { passive: true });
 
         function init() {
             daeun = { x: 180, y: 420, size: 30, speed: 7 };
@@ -82,6 +161,7 @@
             gameOver = false;
             gameWin = false;
             frameCount = 0;
+            daeunSpeech = { text: '', showUntil: 0 };
             cancelAnimationFrame(animationId);
             loop();
         }
@@ -105,6 +185,11 @@
             if (keys['ArrowDown'] && daeun.y < canvas.height - daeun.size - 15) daeun.y += daeun.speed;
 
             frameCount++;
+            // 다은이 대사 (2~4초마다 랜덤)
+            if (frameCount > daeunSpeech.showUntil && Math.random() < 0.02) {
+                daeunSpeech.text = daeunPhrases[Math.floor(Math.random() * daeunPhrases.length)];
+                daeunSpeech.showUntil = frameCount + 90 + Math.floor(Math.random() * 60);
+            }
             // 점수가 오를수록 엄청나게 자주 떨어짐
             let spawnRate = Math.max(3, 18 - Math.floor(score / 7));
             if (frameCount % spawnRate === 0) spawnWork();
@@ -149,13 +234,49 @@
             ctx.fillStyle = '#f8f9fa';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 다은이
+            // 다은이 (아이콘과 이름표 중앙 정렬)
+            const centerX = daeun.x + daeun.size / 2;
+            ctx.textAlign = 'center';
             ctx.font = '30px Arial';
-            ctx.fillText('🏃‍♀️', daeun.x, daeun.y + daeun.size);
+            ctx.fillText('🏃‍♀️', centerX, daeun.y + daeun.size);
             ctx.font = '14px Malgun Gothic';
             ctx.fillStyle = '#1e40af';
             ctx.fontWeight = 'bold';
-            ctx.fillText('다은', daeun.x - 2, daeun.y + daeun.size + 15);
+            ctx.fillText('다은', centerX, daeun.y + daeun.size + 15);
+            ctx.textAlign = 'left';
+
+            // 다은이 말풍선
+            if (daeunSpeech.text && frameCount < daeunSpeech.showUntil && !gameOver && !gameWin) {
+                ctx.font = '13px Malgun Gothic';
+                const metrics = ctx.measureText(daeunSpeech.text);
+                const bubbleW = Math.min(metrics.width + 28, canvas.width - 20);
+                const bubbleH = 28;
+                let bubbleX = centerX - bubbleW / 2;
+                bubbleX = Math.max(5, Math.min(bubbleX, canvas.width - bubbleW - 5));
+                const bubbleY = Math.max(5, daeun.y - bubbleH - 8);
+                const bubbleCenterX = bubbleX + bubbleW / 2;
+                const r = 10;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+                ctx.strokeStyle = '#495057';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(bubbleX + r, bubbleY);
+                ctx.lineTo(bubbleX + bubbleW - r, bubbleY);
+                ctx.quadraticCurveTo(bubbleX + bubbleW, bubbleY, bubbleX + bubbleW, bubbleY + r);
+                ctx.lineTo(bubbleX + bubbleW, bubbleY + bubbleH - r);
+                ctx.quadraticCurveTo(bubbleX + bubbleW, bubbleY + bubbleH, bubbleX + bubbleW - r, bubbleY + bubbleH);
+                ctx.lineTo(bubbleX + r, bubbleY + bubbleH);
+                ctx.quadraticCurveTo(bubbleX, bubbleY + bubbleH, bubbleX, bubbleY + bubbleH - r);
+                ctx.lineTo(bubbleX, bubbleY + r);
+                ctx.quadraticCurveTo(bubbleX, bubbleY, bubbleX + r, bubbleY);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#212529';
+                ctx.textAlign = 'center';
+                ctx.fillText(daeunSpeech.text, bubbleCenterX, bubbleY + bubbleH / 2 + 4);
+                ctx.textAlign = 'left';
+            }
 
             // 업무들
             for (let w of works) {
